@@ -5,8 +5,8 @@ from collections import namedtuple
 
 import img_utils
 from mdp import gridworld
-from mdp import value_iteration
-from deep_maxent_irl_torch import *
+from mdp import value_iteration_wideworld
+from deep_maxent_irl_torch_wideworld import *
 from maxent_irl import *
 from utils import *
 from lp_irl import *
@@ -16,26 +16,25 @@ Step = namedtuple('Step','cur_state action next_state reward done')
 
 
 PARSER = argparse.ArgumentParser(description=None)
-PARSER.add_argument('-hei', '--height', default=5, type=int, help='height of the gridworld')
-PARSER.add_argument('-wid', '--width', default=5, type=int, help='width of the gridworld')
+PARSER.add_argument('-hei', '--height', default=7, type=int, help='height of the gridworld')
+PARSER.add_argument('-wid', '--width', default=7, type=int, help='width of the gridworld')
 PARSER.add_argument('-g', '--gamma', default=0.9, type=float, help='discount factor')
-PARSER.add_argument('-a', '--act_random', default=0.2, type=float, help='probability of acting randomly')
-PARSER.add_argument('-t', '--n_trajs', default=50000, type=int, help='number of expert trajectories')
+PARSER.add_argument('-a', '--act_random', default=0.3, type=float, help='probability of acting randomly')
+PARSER.add_argument('-t', '--n_trajs', default=10000, type=int, help='number of expert trajectories')
 PARSER.add_argument('-l', '--l_traj', default=100, type=int, help='length of expert trajectory')
 PARSER.add_argument('--rand_start', dest='rand_start', action='store_true', help='when sampling trajectories, randomly pick start positions')
 PARSER.add_argument('--no-rand_start', dest='rand_start',action='store_false', help='when sampling trajectories, fix start positions')
-PARSER.set_defaults(rand_start=True)
+PARSER.set_defaults(rand_start=False)
 PARSER.add_argument('-lr', '--learning_rate', default=0.02, type=float, help='learning rate')
-PARSER.add_argument('-ni', '--n_iters', default=200, type=int, help='number of iterations')
+PARSER.add_argument('-ni', '--n_iters', default=5000, type=int, help='number of iterations')
 ARGS = PARSER.parse_args()
 print ARGS
 
 
 GAMMA = ARGS.gamma
 ACT_RAND = ARGS.act_random
-
 R_MAX = 10# the constant r_max does not affect much the recoverred reward distribution
-R_MIN = -100
+R_MIN = -30
 H = ARGS.height
 W = ARGS.width
 N_TRAJS = ARGS.n_trajs
@@ -94,15 +93,28 @@ def main():
   N_STATES = H * W
   N_ACTIONS = 5
 
-  rmap_gt = np.ones([H, W])
+  rmap_gt = - np.ones([H, W])
+  rmap_gt[H-7, W-4] = R_MIN
+  rmap_gt[H-6, W-4] = R_MIN
   rmap_gt[H-5, W-4] = R_MIN
   rmap_gt[H-4, W-4] = R_MIN
   rmap_gt[H-3, W-4] = R_MIN
   rmap_gt[H-2, W-4] = R_MIN
-
+  rmap_gt[H-7, W-5] = R_MIN
+  rmap_gt[H-6, W-5] = R_MIN
+  rmap_gt[H - 5, W - 5] = R_MIN
+  rmap_gt[H - 4, W - 5] = R_MIN
+  rmap_gt[H - 3, W - 5] = R_MIN
+  rmap_gt[H - 2, W - 5] = R_MIN
+  rmap_gt[H-7, W-6] = R_MIN
+  rmap_gt[H-6, W-6] = R_MIN
+  rmap_gt[H-5, W-6] = R_MIN
+  rmap_gt[H-4, W-6] = R_MIN
+  rmap_gt[H-3, W-6] = R_MIN
+  rmap_gt[H-2, W-6] = R_MIN
   #rmap_gt[0, W-1] = R_MAX
   #rmap_gt[H-1, 0] = R_MAX
-  rmap_gt[H-5, W-1] = R_MAX
+  rmap_gt[H-7, W-1] = R_MAX
 
 
   gw = gridworld.GridWorld(rmap_gt, {}, 1 - ACT_RAND)
@@ -112,11 +124,11 @@ def main():
   rewards_gt = numpyToTensor(rewards_gt)
   P_a = gw.get_transition_mat()
 
-  values_gt, policy_gt = value_iteration.value_iteration(P_a, rewards_gt, GAMMA, error=0.01, deterministic=True, npy=False)
+  values_gt, policy_gt = value_iteration_wideworld.value_iteration(P_a, rewards_gt, GAMMA, error=0.01, deterministic=True, npy=False)
   
   # use identity matrix as feature
-  #feat_map = torch.eye(N_STATES)
-  feat_map = torch.rand(N_STATES, N_STATES)- 0.5
+  feat_map = torch.eye(N_STATES)
+  #feat_map = torch.rand(N_STATES, N_STATES)- 0.5
 
   trajs = generate_demonstrations(gw, policy_gt, n_trajs=N_TRAJS, len_traj=L_TRAJ, rand_start=RAND_START)
   
@@ -124,7 +136,7 @@ def main():
   Trainer = trainer(feat_map, P_a, GAMMA, trajs, LEARNING_RATE, N_ITERS)
   rewards, mu_D, mu_exp = Trainer.deep_maxent_irl(feat_map, P_a, GAMMA, trajs, ARGS.learning_rate, N_ITERS, rewards_gt)
 
-  values, _ = value_iteration.value_iteration(P_a, rewards, GAMMA, error=0.01, deterministic=False, npy = True)
+  values, _ = value_iteration_wideworld.value_iteration(P_a, rewards, GAMMA, error=0.01, deterministic=True, npy = True)
 
   rewards_gt = rewards_gt.data.numpy()
   values = values.numpy()

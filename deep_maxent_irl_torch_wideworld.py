@@ -1,6 +1,6 @@
 
 import mdp.gridworld as gridworld
-import mdp.value_iteration as value_iteration
+import mdp.value_iteration_wideworld as value_iteration
 import img_utils
 import tf_utils
 from utils import *
@@ -9,7 +9,7 @@ import torch.nn as nn
 from torch import optim
 import torchvision
 from torch.autograd import Variable
-from network import build_network
+from network import build_network_c_wideworld
 import numpy as np
 
 
@@ -44,9 +44,7 @@ def compute_state_visition_freq(P_a, gamma, trajs, policy, deterministic=False):
         for pre_s in range(N_STATES):
           mu[s, t+1] += mu[pre_s, t]*P_a[pre_s, s, int(policy[pre_s])]
       else:
-        for pre_s in range(N_STATES):
-          for a1 in range(N_ACTIONS):
-            mu[s, t+1] += torch.sum([mu[pre_s, t]*P_a[pre_s, s, a1]*policy[pre_s, a1] ])
+        mu[s, t+1] = torch.sum(torch.sum([mu[pre_s, t]*P_a[pre_s, s, a1]*policy[pre_s, a1] for a1 in range(N_ACTIONS)]) for pre_s in range(N_STATES))
   p = torch.sum(mu, 1)
   return p
 
@@ -69,19 +67,18 @@ def demo_svf(trajs, n_states):
   return p
 
 class trainer:
-  def __init__(self, n_input, lr, n_h1=400, n_h2=300, l2=10, name='deep_irl_fc'):
+  def __init__(self, n_input, lr, n_h1=25, n_h2=20, l2=10, name='deep_irl_fc_wideworld'):
     self.n_input = n_input
     self.lr = lr
     self.n_h1 = n_h1
     self.n_h2 = n_h2
     self.name = name
-    self.networks = build_network()
-
+    self.networks = build_network_c_wideworld()
     # self.network = self.network.cuda()
 
     self.finetune(allow=True)
 
-    # self.sess = tf.Session()self.
+    # self.sess = tf.Session()
     # self.input_s, self.reward, self.theta = self.build_network(self.name)
     self.optimizer = optim.SGD(self.networks.parameters(), lr=0.001)
     # self.optimizer = tf.train.GradientDescentOptimizer(lr)
@@ -115,47 +112,54 @@ class trainer:
     N_STATES, _, N_ACTIONS = np.shape(P_a)
 
     # init nn model
-    feat_map = feat_map.view(1, 1, 25, 25)
+    feat_map = feat_map.view(1, 1, 49, 49)
     feat_map = Variable(feat_map)
 
 
 
     # find state visitation frequencies using demonstrations
     mu_D = demo_svf(trajs, N_STATES)
+    self.networks.train()
 
     # training
-    self.networks.train()
     for iteration in range(n_iters):
       if iteration % (n_iters/10) == 0:
         print 'iteration: {}'.format(iteration)
-
       self.networks.zero_grad()
 
       # compute the reward matrix
       rewards = self.networks(feat_map)
-      rewards = rewards.view(25, 1)
 
       # compute policy
+      rewards = rewards.view(49, 1)
       _, policy = value_iteration.value_iteration(P_a, rewards, gamma, error=0.01, deterministic=True, npy=False)
 
       # compute expected svf
       mu_exp = compute_state_visition_freq(P_a, gamma, trajs, policy, deterministic=True)
-      rewards = rewards.view(25)
 
       # compute gradients on rewards:
+      rewards = rewards.view(49)
+
+      # Set Gradient
       torch.autograd.backward([rewards], [-(mu_D-mu_exp)])
 
-      # update
+      # Update / Optimizer: SGD
       self.optimizer.step()
 
-    #get output
+      # apply gradients to the neural network
+      # grad_theta, l2_loss, grad_norm = nn_r.apply_grads(feat_map, grad_r)
+
+    # get output
     self.networks.eval()
     rewards = self.networks(feat_map)
+    rewards = rewards.view(49, 1)
+    _, policy = value_iteration.value_iteration(P_a, rewards, gamma, error=0.01, deterministic=True, npy=False)
+    mu_exp = compute_state_visition_freq(P_a, gamma, trajs, policy, deterministic=True)
+
     # return sigmoid(normalize(rewards))
-    rewards = rewards.view(25, 1)
-    #for normalize
-    rewards = rewards.data.numpy()
-    return normalize(rewards), mu_D, mu_exp
+    rewards = rewards.view(49, 1)
+    rewards = rewards.data.numpy() # for normalize
+    return rewards, mu_D, mu_exp
 
   def numpyToTensor(self, x):
     x = torch.from_numpy(x)

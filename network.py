@@ -1,3 +1,4 @@
+import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import torchvision.models as models
@@ -18,8 +19,9 @@ class build_c_network(nn.Module):
         #self.conv0 = conv(1, conv_dim, 5, stride=1, pad=2, bn=True)
         self.conv1 = conv(1, conv_dim*2, 5, stride=2, pad=2,  bn=True)
         self.conv1_1 = conv(conv_dim*2, conv_dim*2, 5, stride = 1, pad=1, bn=True)
-        self.conv1_2 = conv(conv_dim*2, conv_dim*2, 5, stride = 1, pad=0, bn=True)
-        self.conv2 = conv(conv_dim*2, conv_dim*4, 3, stride=1, pad=1, bn=True)
+        self.conv1_2 = conv(conv_dim*2, conv_dim*4, 5, stride = 1, pad=0, bn=True)
+        #self.conv1_3 = conv(conv_dim*2, conv_dim*2, 5, stride=1, pad=2, bn=True)
+        self.conv2 = conv(conv_dim*4, conv_dim*4, 3, stride=1, pad=1, bn=True)
         self.conv2_1 = conv(conv_dim*4, conv_dim*4 , 3, stride=1, pad=1, bn=True)
         self.conv2_2 = conv(conv_dim * 4, conv_dim * 4, 3, stride=1, pad=0, bn=True)
         self.conv3 = conv(conv_dim*4, conv_dim*8, 1, stride=1, pad=0, bn=True)
@@ -32,8 +34,11 @@ class build_c_network(nn.Module):
         out = F.elu(self.conv1(x))
         out = F.elu(self.conv1_1(out))
         out = F.elu(self.conv1_2(out))
+        #out = F.elu(self.conv1_3(out))
+        out_res = out
         out = F.elu(self.conv2(out))
         out = F.elu(self.conv2_1(out))
+        out = out_res + out
         out = F.elu(self.conv2_2(out))
         out = F.elu(self.conv3(out))
         out = F.elu(self.fc(out).squeeze())

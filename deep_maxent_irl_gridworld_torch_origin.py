@@ -6,7 +6,7 @@ from collections import namedtuple
 import img_utils
 from mdp import gridworld
 from mdp import value_iteration
-from deep_maxent_irl_torch import *
+from deep_maxent_irl_torch_origin import *
 from maxent_irl import *
 from utils import *
 from lp_irl import *
@@ -20,15 +20,15 @@ PARSER.add_argument('-hei', '--height', default=5, type=int, help='height of the
 PARSER.add_argument('-wid', '--width', default=5, type=int, help='width of the gridworld')
 PARSER.add_argument('-g', '--gamma', default=0.9, type=float, help='discount factor')
 PARSER.add_argument('-a', '--act_random', default=0.2, type=float, help='probability of acting randomly')
-PARSER.add_argument('-t', '--n_trajs', default=128, type=int, help='number of expert trajectories')
+PARSER.add_argument('-t', '--n_trajs', default=50000, type=int, help='number of expert trajectories')
 PARSER.add_argument('-l', '--l_traj', default=100, type=int, help='length of expert trajectory')
 PARSER.add_argument('--rand_start', dest='rand_start', action='store_true', help='when sampling trajectories, randomly pick start positions')
 PARSER.add_argument('--no-rand_start', dest='rand_start',action='store_false', help='when sampling trajectories, fix start positions')
 PARSER.set_defaults(rand_start=True)
 PARSER.add_argument('-lr', '--learning_rate', default=0.02, type=float, help='learning rate')
-PARSER.add_argument('-ni', '--n_iters', default=5000, type=int, help='number of iterations')
+PARSER.add_argument('-ni', '--n_iters', default=1000, type=int, help='number of iterations')
 ARGS = PARSER.parse_args()
-print ARGS
+print (ARGS)
 
 
 GAMMA = ARGS.gamma
@@ -120,7 +120,7 @@ def main():
 
   trajs = generate_demonstrations(gw, policy_gt, n_trajs=N_TRAJS, len_traj=L_TRAJ, rand_start=RAND_START)
   
-  print 'Deep Max Ent IRL training ..'
+  print ('Deep Max Ent IRL training ..')
   Trainer = trainer(feat_map, P_a, GAMMA, trajs, LEARNING_RATE, N_ITERS)
   rewards, mu_D, mu_exp = Trainer.deep_maxent_irl(feat_map, P_a, GAMMA, trajs, ARGS.learning_rate, N_ITERS, rewards_gt)
 

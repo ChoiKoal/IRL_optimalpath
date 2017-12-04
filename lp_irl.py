@@ -20,7 +20,7 @@ def lp_irl(trans_probs, policy, gamma=0.5, l1=10, R_max=10):
   returns:
     rewards           Nx1 reward vector
   """
-  print np.shape(trans_probs)
+  print (np.shape(trans_probs))
   N_STATES, _, N_ACTIONS = np.shape(trans_probs)
   N_STATES = int(N_STATES)
   N_ACTIONS = int(N_ACTIONS)

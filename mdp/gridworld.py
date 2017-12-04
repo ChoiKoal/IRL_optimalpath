@@ -46,7 +46,7 @@ class GridWorld(object):
 
   def show_grid(self):
     for i in range(len(self.grid)):
-      print self.grid[i]
+      print (self.grid[i])
 
   def get_grid(self):
     return self.grid
@@ -245,7 +245,7 @@ class GridWorld(object):
   ###################################
 
   def display_qvalue_grid(self, qvalues):
-    print "==Display q-value grid=="
+    print ("==Display q-value grid==")
 
     qvalues_grid = np.empty((len(self.grid), len(self.grid[0])), dtype=object)
     for s in self.get_states():
@@ -261,13 +261,13 @@ class GridWorld(object):
 
     row_format = '{:>40}' * (len(self.grid[0]))
     for row in qvalues_grid:
-      print row_format.format(*row)
+      print (row_format.format(*row))
 
   def display_value_grid(self, values):
     """
     Prints a nice table of the values in grid
     """
-    print "==Display value grid=="
+    print ("==Display value grid==")
 
     value_grid = np.zeros((len(self.grid), len(self.grid[0])))
     for k in values:
@@ -275,7 +275,7 @@ class GridWorld(object):
 
     row_format = '{:>20.4}' * (len(self.grid[0]))
     for row in value_grid:
-      print row_format.format(*row)
+      print (row_format.format(*row))
 
   def display_policy_grid(self, policy):
     """
@@ -283,7 +283,7 @@ class GridWorld(object):
     input:
       policy    a dictionary of the optimal policy {<state, action_dist>}
     """
-    print "==Display policy grid=="
+    print ("==Display policy grid==")
 
     policy_grid = np.chararray((len(self.grid), len(self.grid[0])))
     for k in self.get_states():
@@ -295,7 +295,7 @@ class GridWorld(object):
 
     row_format = '{:>20}' * (len(self.grid[0]))
     for row in policy_grid:
-      print row_format.format(*row)
+      print (row_format.format(*row))
 
   #######################
   # Some util functions #

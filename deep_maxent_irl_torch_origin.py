@@ -13,59 +13,8 @@ from network import build_c_network
 import numpy as np
 
 
-R_MAX= 10
-H = 5
-W = 5
-R_MIN = -100
-ACT_RAND = 0.2
-rmap_gt = np.ones([H, W])
-rmap_gt[H - 5, W - 4] = R_MIN
-rmap_gt[H - 4, W - 4] = R_MIN
-rmap_gt[H - 3, W - 4] = R_MIN
-rmap_gt[H - 2, W - 4] = R_MIN
 
-# rmap_gt[0, W-1] = R_MAX
-# rmap_gt[H-1, 0] = R_MAX
-rmap_gt[H - 5, W - 1] = R_MAX
-gw = gridworld.GridWorld(rmap_gt, {}, 1 - ACT_RAND)
-
-def generate_demonstrations(gw, policy, n_trajs=100, len_traj=20, rand_start=False, start_pos=[0,0]):
-  """gatheres expert demonstrations
-
-  inputs:
-  gw          Gridworld - the environment
-  policy      Nx1 matrix
-  n_trajs     int - number of trajectories to generate
-  rand_start  bool - randomly picking start position or not
-  start_pos   2x1 list - set start position, default [0,0]
-  returns:
-  trajs       a list of trajectories - each element in the list is a list of Steps representing an episode
-  """
-
-  trajs = []
-  #rand_start = True
-  for i in range(n_trajs):
-    if rand_start:
-      # override start_pos
-      start_pos = [np.random.randint(0, gw.height), np.random.randint(0, gw.width)]
-
-    episode = []
-    gw.reset(start_pos)
-    cur_state = start_pos
-    cur_state, action, next_state, reward, is_done = gw.step(int(policy[gw.pos2idx(cur_state)]))
-    episode.append(Step(cur_state=gw.pos2idx(cur_state), action=action, next_state=gw.pos2idx(next_state), reward=reward, done=is_done))
-    # while not is_done:
-    for _ in range(len_traj):
-        cur_state, action, next_state, reward, is_done = gw.step(int(policy[gw.pos2idx(cur_state)]))
-        episode.append(Step(cur_state=gw.pos2idx(cur_state), action=action, next_state=gw.pos2idx(next_state), reward=reward, done=is_done))
-        if is_done:
-            break
-        if cur_state == [H - 5, W - 1]:
-          break
-    trajs.append(episode)
-  return trajs
-
-def compute_state_visition_freq(P_a, gamma, trajs, policy, deterministic=True):
+def compute_state_visition_freq(P_a, gamma, trajs, policy, deterministic=False):
   """compute the expected states visition frequency p(s| theta, T) 
   using dynamic programming
 
@@ -89,20 +38,13 @@ def compute_state_visition_freq(P_a, gamma, trajs, policy, deterministic=True):
     mu[traj[0].cur_state, 0] += 1
   mu[:,0] = mu[:,0]/len(trajs)
 
-  P_a = torch.from_numpy(P_a)
-
-  if deterministic:
-    policy = policy
-  else:
-    policy = torch.transpose(policy, 0, 1)
   for s in range(N_STATES):
     for t in range(T-1):
       if deterministic:
         for pre_s in range(N_STATES):
           mu[s, t+1] += mu[pre_s, t]*P_a[pre_s, s, int(policy[pre_s])]
       else:
-        for pre_s in range(N_STATES):
-          mu[s, t+1] += sum([mu[pre_s, t]*P_a[pre_s, s, a1]*policy[pre_s, a1] for a1 in range(N_ACTIONS)])
+        mu[s, t+1] = torch.sum(torch.sum([mu[pre_s, t]*P_a[pre_s, s, a1]*policy[pre_s, a1] for a1 in range(N_ACTIONS)]) for pre_s in range(N_STATES))
   p = torch.sum(mu, 1)
   return p
 
@@ -168,22 +110,21 @@ class trainer:
     # tf.set_random_seed(1)
     self.rewards_gt = rewards_gt
     N_STATES, _, N_ACTIONS = np.shape(P_a)
-    self.lr= lr
 
     # init nn model
     feat_map = feat_map.view(1, 1, 25, 25)
     feat_map = Variable(feat_map)
 
-
-    value = torch.zeros(H, W)
+    value = torch.zeros(5, 5)
     # find state visitation frequencies using demonstrations
     mu_D = demo_svf(trajs, N_STATES)
     self.networks.train()
-    iteration  = 0
+
     # training
     for iteration in range(n_iters):
-    #while True:
-
+      #if iteration % (n_iters/10) == 0:
+      #  print 'iteration: {}'.format(iteration)
+      self.networks.zero_grad()
 
       # compute the reward matrix
       rewards = self.networks(feat_map)
@@ -192,15 +133,6 @@ class trainer:
       rewards = rewards.view(25, 1)
       value_new, policy = value_iteration.value_iteration(P_a, rewards, gamma, error=0.01, deterministic=True, npy=False)
 
-      #dyna algorithm
-      if iteration % (n_iters/10) ==0 and iteration/ (n_iters/10) > 30:
-        # get new trajs
-        trajs_new = generate_demonstrations(gw, policy, n_trajs=10, len_traj=20, rand_start=True)
-        trajs+=trajs_new
-
-        # update gt_svf
-        mu_D = demo_svf(trajs, N_STATES)
-
       # compute expected svf
       mu_exp = compute_state_visition_freq(P_a, gamma, trajs, policy, deterministic=True)
 
@@ -208,26 +140,18 @@ class trainer:
       rewards = rewards.view(25)
 
       # Set Gradient
-      torch.autograd.backward([rewards], [-(mu_D-mu_exp)*self.lr])
+      torch.autograd.backward([rewards], [-(mu_D-mu_exp)])
 
       # Update / Optimizer: SGD
       self.optimizer.step()
 
-      #iteration += 1
-
-      # break
-      if torch.mean(torch.abs(value - value_new)) < 1e-3:
-        break
-
-      # print
+      # apply gradients to the neural network
+      # grad_theta, l2_loss, grad_norm = nn_r.apply_grads(feat_map, grad_r)
       if iteration % (50) == 0:
         print ('iteration: %.d , value_diff: %.4f, svf_diff: %.4f'
                % (iteration, torch.mean(torch.abs(value-value_new)), torch.mean(mu_D-mu_exp)))
-      self.networks.zero_grad()
 
       value = value_new
-      # apply gradients to the neural network
-      # grad_theta, l2_loss, grad_norm = nn_r.apply_grads(feat_map, grad_r)
 
     # get output
     self.networks.eval()

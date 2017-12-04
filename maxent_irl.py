@@ -84,7 +84,7 @@ def maxent_irl(feat_map, P_a, gamma, trajs, lr, n_iters):
   for iteration in range(n_iters):
   
     if iteration % (n_iters/20) == 0:
-      print 'iteration: {}/{}'.format(iteration, n_iters)
+      print ('iteration: {}/{}'.format(iteration, n_iters))
     
     # compute reward function
     rewards = np.dot(feat_map, theta)

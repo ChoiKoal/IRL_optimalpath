@@ -17,7 +17,7 @@ def heatmap2d(hm_mat, title='', block=True, fig_num=1, text=True):
   input:
     hm_mat:   mxn 2d np array
   """
-  print ('map shape: {}, data type: {}'.format(hm_mat.shape, hm_mat.dtype))
+  #print ('map shape: {}, data type: {}'.format(hm_mat.shape, hm_mat.dtype))
 
   if block:
     plt.figure(fig_num)

@@ -77,6 +77,7 @@ def value_iteration(P_a, rewards, gamma, error=0.01, deterministic=True, npy=Tru
 
 
 
+
     if Variable(v_error).data[0] < error:
       break
 
